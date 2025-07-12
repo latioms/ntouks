@@ -39,7 +39,7 @@ export function LoginForm({
         })
         // Petit délai pour que l'utilisateur voie la notification de succès
         setTimeout(() => {
-          router.push("/") // Redirection vers la page d'accueil
+          router.push("/dashboard") // Redirection vers la page d'accueil
         }, 1000)
       }
     } catch (error) {
