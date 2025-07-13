@@ -56,8 +56,8 @@ const Signup = ({
       if (result.error) {
         setError(result.error.message || "Une erreur est survenue");
       } else {
-        // Redirection vers la page d'accueil après inscription réussie
-        router.push("/");
+        // Redirection vers la sélection de rôle après inscription réussie
+        router.push("/select-role");
       }
     } catch (err) {
       setError("Une erreur est survenue lors de l'inscription");

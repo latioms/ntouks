@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Routes qui nécessitent une authentification
-const protectedRoutes = ['/dashboard', '/settings']
+const protectedRoutes = ['/dashboard', '/settings', '/mecano', '/station']
 
 // Routes d'authentification (redirection si déjà connecté)
-const authRoutes = [ '/login', '/register']
+const authRoutes = ['/login', '/register']
+
+// Routes spécifiques aux rôles
+const roleBasedRoutes = {
+  '/mecano': ['MECHANIC', 'ADMIN'],
+  '/station': ['STATION_MANAGER', 'ADMIN'],
+  '/dashboard': ['ADMIN', 'STATION_MANAGER', 'MECHANIC', 'CUSTOMER']
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -28,6 +35,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Role-based access control (simplified for now)
+  // Note: For full implementation, you'd need to fetch user role from database
+  // This is a basic version that can be enhanced with proper role checking
+  
   return NextResponse.next()
 }
 

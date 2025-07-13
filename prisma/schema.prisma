@@ -8,6 +8,92 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Role and Permission models
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  resource    String   // e.g., "requests", "mechanics", "stations"
+  action      String   // e.g., "create", "read", "update", "delete"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  
+  // Relations
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// Enums
+enum BreakdownType {
+  MECHANICAL
+  ELECTRICAL
+  TIRE
+  BATTERY
+  ENGINE
+  TRANSMISSION
+  BRAKES
+  OTHER
+
+  @@map("breakdown_type")
+}
+
+enum RequestStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@map("request_status")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+
+  @@map("payment_status")
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  BANK_TRANSFER
+  MOBILE_PAYMENT
+
+  @@map("payment_method")
+}
+
 model User {
   id            String    @id
   name          String
@@ -16,10 +102,15 @@ model User {
   image         String?
   createdAt     DateTime
   updatedAt     DateTime
+  roleId        String?
+  
+  // Relations
   accounts      Account[]
   sessions      Session[]
+  role          Role?     @relation(fields: [roleId], references: [id])
+  mechanic      Mechanic?
 
-  @@map("user")
+  @@map("users")
 }
 
 model Session {
@@ -33,7 +124,7 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("session")
+  @@map("sessions")
 }
 
 model Account {
@@ -52,7 +143,7 @@ model Account {
   updatedAt             DateTime
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("account")
+  @@map("accounts")
 }
 
 model Verification {
@@ -63,5 +154,125 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  @@map("verification")
+  @@map("verifications")
+}
+
+// Station model
+model Station {
+  id          String     @id @default(cuid())
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  phone       String
+  email       String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relations
+  mechanics   Mechanic[]
+  requests    Request[]
+
+  @@map("stations")
+}
+
+// Mechanic model
+model Mechanic {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  phone         String
+  email         String    @unique
+  specialties   String[]
+  isAvailable   Boolean   @default(true)
+  latitude      Float?
+  longitude     Float?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  stationId     String
+  userId        String?   @unique
+  
+  // Relations
+  station       Station   @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  requests      Request[]
+
+  @@map("mechanics")
+}
+
+// Request model (equivalent to demandes)
+model Request {
+  id                String        @id @default(cuid())
+  requesterName     String
+  requesterPhone    String
+  requesterEmail    String?
+  breakdownType     BreakdownType
+  description       String
+  urgency           Int           @default(1)
+  address           String
+  latitude          Float
+  longitude         Float
+  vehicleBrand      String?
+  vehicleModel      String?
+  vehicleYear       Int?
+  licensePlate      String?
+  status            RequestStatus @default(PENDING)
+  priority          Int           @default(1)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  assignedAt        DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  mechanicId        String?
+  stationId         String?
+  
+  // Relations
+  mechanic          Mechanic?     @relation(fields: [mechanicId], references: [id], onDelete: SetNull)
+  station           Station?      @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  interventions     Intervention[]
+  invoice           Invoice?
+
+  @@map("requests")
+}
+
+// Intervention model
+model Intervention {
+  id              String   @id @default(cuid())
+  description     String
+  estimatedTime   Int?     // in minutes
+  actualTime      Int?     // in minutes
+  cost            Float?
+  parts           String[]
+  observations    String?
+  photos          String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  requestId       String
+  
+  // Relations
+  request         Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("interventions")
+}
+
+// Invoice model (equivalent to factures)
+model Invoice {
+  id              String        @id @default(cuid())
+  number          String        @unique
+  totalAmount     Float
+  partsAmount     Float         @default(0)
+  laborAmount     Float         @default(0)
+  taxAmount       Float         @default(0)
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  paidAt          DateTime?
+  requestId       String        @unique
+  
+  // Relations
+  request         Request       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
 }
