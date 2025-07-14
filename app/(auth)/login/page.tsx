@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/login-form"
+import { LoginSuccessRedirect } from "@/components/auth/login-success-redirect"
 
 export default function LoginPage() {
   return (
@@ -6,6 +7,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm md:max-w-3xl">
         <LoginForm />
       </div>
+      <LoginSuccessRedirect />
     </div>
   )
 }

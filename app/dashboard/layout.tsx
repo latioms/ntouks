@@ -6,7 +6,7 @@ import { useSession } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
-export default function PlatformLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
@@ -34,21 +34,17 @@ export default function PlatformLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <div className="flex-1">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <div className="h-4 w-px bg-border mx-2" />
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">Dashboard</h1>
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto p-6">
-            {children}
-          </main>
+      <AppSidebar />
+      <main className="flex-1 min-h-screen">
+        <div className="border-b bg-background sticky top-0 z-10">
+          <div className="flex h-16 items-center px-4">
+            <SidebarTrigger />
+          </div>
         </div>
-      </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </main>
     </SidebarProvider>
   )
 }

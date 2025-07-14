@@ -37,10 +37,53 @@ export function LoginForm({
         toast.success("Connexion réussie !", {
           description: "Vous êtes maintenant connecté"
         })
-        // Petit délai pour que l'utilisateur voie la notification de succès
-        setTimeout(() => {
-          router.push("/dashboard") // Redirection vers la page d'accueil
-        }, 1000)
+        
+        // Récupérer l'utilisateur avec son rôle pour la redirection
+        try {
+          const userResponse = await fetch('/api/user')
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            const roleName = userData.user.role?.name
+            
+            // Déterminer la page de redirection selon le rôle
+            let redirectPath = '/dashboard' // Fallback par défaut
+            if (roleName) {
+              switch (roleName) {
+                case 'ADMIN':
+                  redirectPath = '/admin/dashboard'
+                  break
+                case 'STATION_MANAGER':
+                  redirectPath = '/dashboard'
+                  break
+                case 'MECHANIC':
+                  redirectPath = '/dashboard'
+                  break
+                case 'USER':
+                  redirectPath = '/assist'
+                  break
+                default:
+                  redirectPath = '/dashboard'
+                  break
+              }
+            }
+            
+            // Petit délai pour que l'utilisateur voie la notification de succès
+            setTimeout(() => {
+              router.push(redirectPath)
+            }, 1000)
+          } else {
+            // Si on ne peut pas récupérer le rôle, redirection par défaut
+            setTimeout(() => {
+              router.push("/dashboard")
+            }, 1000)
+          }
+        } catch (userError) {
+          console.error("Erreur lors de la récupération du rôle:", userError)
+          // Redirection par défaut en cas d'erreur
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error("Erreur de connexion:", error)

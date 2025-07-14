@@ -243,22 +243,9 @@ async function main() {
     })
   }
 
-  // Create a sample station
-  const station = await prisma.station.create({
-    data: {
-      name: 'Station Centrale',
-      address: '123 Avenue Principale, Tunis',
-      latitude: 36.8065,
-      longitude: 10.1815,
-      phone: '+216 71 123 456',
-      email: 'centrale@ntouks.tn'
-    }
-  })
-
   console.log('🎉 Database seeded successfully!')
   console.log('Roles created:', { adminRole, stationManagerRole, mechanicRole, customerRole })
   console.log('Permissions created:', permissions.length)
-  console.log('Sample station created:', station.name)
 }
 
 main()

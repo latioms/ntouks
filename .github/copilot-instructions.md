@@ -54,3 +54,7 @@ Création d’un projet Next.js
 Setup de Supabase (tables, auth, policies)
 
 Installation des dépendances utiles (Tailwind, Zustand/Redux, etc.)
+
+
+
+je ne veux pas les fichier des plus de 160 lignes de code (sinon tu modules, ya tjours un moyen de moduler)

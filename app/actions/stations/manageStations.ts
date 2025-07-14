@@ -132,3 +132,45 @@ export async function deleteStation(id: string) {
     throw new Error("Impossible de supprimer la station");
   }
 }
+
+export async function createStationWithManager(
+  stationData: {
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    phone: string;
+    email?: string;
+  },
+  userId: string
+) {
+  try {
+    // Créer la station
+    const station = await createStation(stationData);
+    
+    // Mettre à jour l'utilisateur pour lui assigner le rôle STATION_MANAGER s'il ne l'a pas déjà
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      include: { role: true }
+    });
+
+    if (user && (!user.role || user.role.name !== 'STATION_MANAGER')) {
+      // Récupérer le rôle STATION_MANAGER
+      const stationManagerRole = await db.role.findUnique({
+        where: { name: 'STATION_MANAGER' }
+      });
+
+      if (stationManagerRole) {
+        await db.user.update({
+          where: { id: userId },
+          data: { roleId: stationManagerRole.id }
+        });
+      }
+    }
+
+    return station;
+  } catch (error) {
+    console.error("Erreur lors de la création de la station avec gestionnaire:", error);
+    throw new Error("Impossible de créer la station");
+  }
+}

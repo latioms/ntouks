@@ -28,57 +28,19 @@ export default function SelectStationPage() {
   const [isLoadingStations, setIsLoadingStations] = useState(true);
   const router = useRouter();
 
-  // Données mockées pour les stations
-  const mockStations: Station[] = [
-    {
-      id: "1",
-      name: "Station Service Dakar Central",
-      address: "Avenue Bourguiba, Dakar",
-      phone: "+221 77 123 45 67",
-      email: "contact@dakarcentral.com",
-      mechanicsCount: 5,
-      distance: "2.3 km",
-      isActive: true
-    },
-    {
-      id: "2",
-      name: "Garage Moderne Almadies",
-      address: "Route des Almadies, Dakar",
-      phone: "+221 77 234 56 78",
-      mechanicsCount: 3,
-      distance: "5.1 km",
-      isActive: true
-    },
-    {
-      id: "3",
-      name: "Station Auto Plus",
-      address: "Parcelles Assainies, Dakar",
-      phone: "+221 77 345 67 89",
-      mechanicsCount: 7,
-      distance: "8.7 km",
-      isActive: true
-    },
-    {
-      id: "4",
-      name: "Garage Express Thiaroye",
-      address: "Thiaroye sur Mer",
-      phone: "+221 77 456 78 90",
-      mechanicsCount: 2,
-      distance: "12.4 km",
-      isActive: true
-    }
-  ];
-
   useEffect(() => {
-    // Simulation du chargement des stations
+    // Chargement des stations réelles depuis l'API
     const loadStations = async () => {
       setIsLoadingStations(true);
       try {
         // TODO: Remplacer par un appel API réel
         // const data = await getAllStations();
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulation
-        setStations(mockStations);
-        setFilteredStations(mockStations);
+        // setStations(data);
+        // setFilteredStations(data);
+        
+        // Pour l'instant, aucune station n'est chargée
+        setStations([]);
+        setFilteredStations([]);
       } catch (error) {
         console.error("Erreur lors du chargement des stations:", error);
       } finally {
@@ -108,7 +70,7 @@ export default function SelectStationPage() {
       
       console.log("Demande pour rejoindre la station:", stationId);
       
-      // Redirection vers le dashboard mécanicien
+      // Redirection vers le dashboard
       router.push("/dashboard");
     } catch (error) {
       console.error("Erreur lors de la demande:", error);
@@ -121,7 +83,7 @@ export default function SelectStationPage() {
       <div className="min-h-screen bg-muted flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p>Chargement des stations...</p>
+          <p>Chargement des stations disponibles...</p>
         </div>
       </div>
     );
@@ -150,12 +112,34 @@ export default function SelectStationPage() {
 
         {/* Liste des stations */}
         <div className="grid gap-4">
-          {filteredStations.length === 0 ? (
+          {isLoadingStations ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Chargement des stations...</p>
+              </CardContent>
+            </Card>
+          ) : filteredStations.length === 0 && searchTerm ? (
             <Card>
               <CardContent className="text-center py-8">
                 <p className="text-muted-foreground">
-                  Aucune station trouvée pour votre recherche
+                  Aucune station trouvée pour "{searchTerm}"
                 </p>
+              </CardContent>
+            </Card>
+          ) : filteredStations.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Aucune station disponible</h3>
+                  <p className="text-muted-foreground">
+                    Il n'y a actuellement aucune station active à rejoindre.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Contactez votre administrateur ou créez une nouvelle station.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           ) : (
