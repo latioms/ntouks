@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
       vehicleBrand,
       vehicleModel,
       vehicleYear,
-      licensePlate
+      licensePlate,
+      stationId
     } = body;
 
     // Validation des champs obligatoires
@@ -36,6 +37,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!stationId) {
+      return NextResponse.json(
+        { error: "Sélection de station requise" },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier que la station existe et est active
+    const station = await db.station.findFirst({
+      where: {
+        id: stationId,
+        isActive: true
+      }
+    });
+
+    if (!station) {
+      return NextResponse.json(
+        { error: "Station non trouvée ou inactive" },
+        { status: 404 }
+      );
+    }
+
     // Créer la demande
     const newRequest = await db.request.create({
       data: {
@@ -44,7 +67,7 @@ export async function POST(request: NextRequest) {
         requesterEmail,
         breakdownType,
         description,
-        urgency: Math.min(Math.max(urgency, 1), 5), // Entre 1 et 5
+        urgency: Math.min(Math.max(urgency, 1), 4), // Entre 1 et 4
         address,
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
@@ -52,16 +75,17 @@ export async function POST(request: NextRequest) {
         vehicleModel,
         vehicleYear: vehicleYear ? parseInt(vehicleYear) : null,
         licensePlate,
-        priority: urgency >= 4 ? 3 : urgency >= 2 ? 2 : 1
+        priority: urgency >= 4 ? 3 : urgency >= 2 ? 2 : 1,
+        stationId // Assigner directement à la station sélectionnée
       }
     });
 
-    // TODO: Envoyer notification aux stations proches
-    // TODO: Envoyer SMS/Email de confirmation
+    // TODO: Trouver un mécanicien disponible dans la station et l'assigner automatiquement
+    await assignMechanicToRequest(newRequest.id, stationId);
 
     return NextResponse.json({
       success: true,
-      request: newRequest,
+      id: newRequest.id,
       message: "Demande d'assistance créée avec succès"
     });
 
@@ -74,15 +98,100 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Fonction pour assigner automatiquement un mécanicien
+async function assignMechanicToRequest(requestId: string, stationId: string) {
+  try {
+    // Chercher un mécanicien disponible dans la station
+    const availableMechanic = await db.mechanic.findFirst({
+      where: {
+        stationId,
+        isAvailable: true
+      },
+      orderBy: {
+        updatedAt: 'asc' // Le moins récemment assigné
+      }
+    });
+
+    if (availableMechanic) {
+      // Assigner le mécanicien
+      await db.request.update({
+        where: { id: requestId },
+        data: {
+          mechanicId: availableMechanic.id,
+          status: 'ASSIGNED',
+          assignedAt: new Date()
+        }
+      });
+
+      // Marquer le mécanicien comme occupé
+      await db.mechanic.update({
+        where: { id: availableMechanic.id },
+        data: { isAvailable: false }
+      });
+
+      console.log(`Mécanicien ${availableMechanic.id} assigné à la demande ${requestId}`);
+    } else {
+      console.log(`Aucun mécanicien disponible dans la station ${stationId}`);
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'assignation du mécanicien:", error);
+  }
+}
+
 // GET - Récupérer les demandes publiques (pour automobilistes)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get('phone');
+    const id = searchParams.get('id');
+
+    if (id) {
+      // Récupérer une demande spécifique par ID
+      const requestData = await db.request.findUnique({
+        where: { id },
+        include: {
+          mechanic: {
+            include: {
+              user: {
+                select: { 
+                  name: true, 
+                  phone: true 
+                }
+              }
+            }
+          },
+          station: {
+            select: { 
+              name: true, 
+              address: true, 
+              phone: true,
+              latitude: true,
+              longitude: true
+            }
+          },
+          interventions: {
+            orderBy: { createdAt: 'desc' }
+          },
+          invoice: true
+        }
+      });
+
+      if (!requestData) {
+        return NextResponse.json(
+          { error: "Demande non trouvée" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        requests: [requestData]
+      });
+    }
 
     if (!phone) {
       return NextResponse.json(
-        { error: "Numéro de téléphone requis" },
+        { error: "Numéro de téléphone ou ID requis" },
         { status: 400 }
       );
     }
@@ -101,7 +210,13 @@ export async function GET(request: NextRequest) {
           }
         },
         station: {
-          select: { name: true, address: true, phone: true }
+          select: { 
+            name: true, 
+            address: true, 
+            phone: true,
+            latitude: true,
+            longitude: true
+          }
         }
       },
       orderBy: { createdAt: 'desc' }

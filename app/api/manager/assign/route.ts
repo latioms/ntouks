@@ -55,12 +55,36 @@ export async function POST(request: NextRequest) {
     // Vérifier que le mécanicien existe et est disponible
     const mechanic = await db.mechanic.findUnique({
       where: { id: mechanicId },
-      include: { user: true }
+      include: { 
+        user: true,
+        requests: {
+          where: {
+            status: {
+              in: ['ASSIGNED', 'IN_PROGRESS']
+            }
+          }
+        }
+      }
     });
 
     if (!mechanic || !mechanic.isAvailable) {
       return NextResponse.json(
         { error: "Mécanicien non disponible" },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier la limite d'assignation (max 2 tâches par mécanicien)
+    const MAX_ASSIGNMENTS = 2;
+    const currentAssignments = mechanic.requests.length;
+
+    if (currentAssignments >= MAX_ASSIGNMENTS) {
+      return NextResponse.json(
+        { 
+          error: `Ce mécanicien a déjà atteint sa limite de ${MAX_ASSIGNMENTS} tâches assignées`,
+          currentAssignments,
+          maxAllowed: MAX_ASSIGNMENTS
+        },
         { status: 400 }
       );
     }

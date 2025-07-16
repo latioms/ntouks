@@ -16,7 +16,9 @@ interface Request {
   createdAt: string;
   mechanic?: {
     id: string;
-    user: {
+    firstName?: string;
+    lastName?: string;
+    user?: {
       name: string;
       email: string;
     };

@@ -4,19 +4,11 @@ import { getAllStations } from "@/app/actions/stations/manageStations";
 
 export async function GET(request: NextRequest) {
   try {
-    // Vérifier l'authentification (optionnel pour la lecture des stations)
-    const session = await auth.api.getSession({
-      headers: request.headers
-    });
-    
-    // Récupérer toutes les stations
+    // Récupérer toutes les stations actives (pas d'auth requise pour les automobilistes)
     const stations = await getAllStations();
 
-    return NextResponse.json({
-      success: true,
-      stations,
-      count: stations.length
-    });
+    // Retourner directement le tableau pour simplifier l'usage
+    return NextResponse.json(stations);
 
   } catch (error) {
     console.error("Erreur lors de la récupération des stations:", error);

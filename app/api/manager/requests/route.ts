@@ -49,13 +49,9 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' }
       });
     } else {
-      // Gestionnaire voit seulement les requêtes de sa station
+      // Gestionnaire voit toutes les requêtes pour l'instant
+      // TODO: Lier les gestionnaires aux stations spécifiques
       requests = await db.request.findMany({
-        where: {
-          mechanic: {
-            stationId: user.id // Assuming user is linked to station
-          }
-        },
         include: {
           mechanic: {
             include: {

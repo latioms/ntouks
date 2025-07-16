@@ -45,11 +45,9 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' }
       });
     } else {
-      // Gestionnaire voit seulement ses mécaniciens
+      // Gestionnaire voit tous les mécaniciens pour l'instant
+      // TODO: Filtrer par station spécifique une fois la relation établie
       mechanics = await db.mechanic.findMany({
-        where: {
-          stationId: user.id // Assuming station manager is linked to station
-        },
         include: {
           user: {
             select: { name: true, email: true, phone: true }
@@ -105,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, specialties, stationId } = body;
+    const { userId, specialties, stationId, firstName, lastName, phone, email } = body;
 
     // Validation
     if (!userId) {
@@ -127,17 +125,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Vérifier qu'il n'est pas déjà mécanicien
+    const existingMechanic = await db.mechanic.findUnique({
+      where: { userId }
+    });
+
+    if (existingMechanic) {
+      return NextResponse.json(
+        { error: "Cet utilisateur est déjà mécanicien" },
+        { status: 400 }
+      );
+    }
+
+    // Récupérer une station par défaut si aucune n'est spécifiée
+    let targetStationId = stationId;
+    if (!targetStationId) {
+      const firstStation = await db.station.findFirst({
+        where: { isActive: true }
+      });
+      if (firstStation) {
+        targetStationId = firstStation.id;
+      } else {
+        return NextResponse.json(
+          { error: "Aucune station active disponible" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Utiliser les informations de l'utilisateur ou celles fournies
+    const mechanicData = {
+      firstName: firstName || targetUser.name?.split(' ')[0] || 'Prénom',
+      lastName: lastName || targetUser.name?.split(' ')[1] || 'Nom',
+      phone: phone || targetUser.phone || '',
+      email: email || targetUser.email,
+      userId,
+      specialties: specialties || [],
+      isAvailable: true,
+      stationId: targetStationId
+    };
+
     // Créer le mécanicien
     const newMechanic = await db.mechanic.create({
-      data: {
-        userId,
-        specialties: specialties || [],
-        isAvailable: true,
-        stationId: stationId || user.id // Use manager's station
-      },
+      data: mechanicData,
       include: {
         user: {
           select: { name: true, email: true }
+        },
+        station: {
+          select: { name: true, address: true }
         }
       }
     });

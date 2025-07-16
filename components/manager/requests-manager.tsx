@@ -23,6 +23,12 @@ export function RequestsManager() {
   const { requests, loading, assignMechanic, fetchRequests } = useManagerRequests();
   const { mechanics, getAvailableMechanics } = useManagerMechanics();
   const [assigningRequest, setAssigningRequest] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  // Filtrer les demandes par statut
+  const filteredRequests = statusFilter === 'ALL' 
+    ? requests 
+    : requests.filter(request => request.status === statusFilter);
 
   const handleAssignMechanic = async (requestId: string, mechanicId: string) => {
     try {
@@ -83,24 +89,53 @@ export function RequestsManager() {
         <div>
           <h2 className="text-2xl font-bold">Demandes d'assistance</h2>
           <p className="text-muted-foreground">
-            Gérez les demandes clients et assignez des mécaniciens
+            Gérez les demandes clients et assignez des mécaniciens ({requests.length} demande{requests.length > 1 ? 's' : ''} au total)
           </p>
         </div>
-        <Button onClick={fetchRequests} variant="outline">
-          Actualiser
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={fetchRequests} variant="outline" size="sm">
+            Actualiser
+          </Button>
+          <Badge variant="secondary" className="text-sm">
+            {availableMechanics.length} mécanicien{availableMechanics.length > 1 ? 's' : ''} disponible{availableMechanics.length > 1 ? 's' : ''}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+        <span className="text-sm font-medium">Filtrer par statut :</span>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Toutes les demandes</SelectItem>
+            <SelectItem value="PENDING">En attente</SelectItem>
+            <SelectItem value="ASSIGNED">Assignées</SelectItem>
+            <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+            <SelectItem value="COMPLETED">Terminées</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex gap-2 ml-auto">
+          <Badge variant="destructive">{requests.filter(r => r.status === 'PENDING').length} en attente</Badge>
+          <Badge variant="default">{requests.filter(r => r.status === 'ASSIGNED').length} assignées</Badge>
+          <Badge variant="secondary">{requests.filter(r => r.status === 'IN_PROGRESS').length} en cours</Badge>
+        </div>
       </div>
 
       <div className="grid gap-4">
-        {requests.length === 0 ? (
+        {filteredRequests.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
               <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Aucune demande d'assistance</p>
+              <p className="text-muted-foreground">
+                {statusFilter === 'ALL' ? 'Aucune demande d\'assistance' : `Aucune demande avec le statut "${statusFilter}"`}
+              </p>
             </CardContent>
           </Card>
         ) : (
-          requests.map((request) => (
+          filteredRequests.map((request) => (
             <Card key={request.id} className="overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -110,7 +145,7 @@ export function RequestsManager() {
                       {request.requesterName}
                       {getUrgencyBadge(request.urgency)}
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-4">
+                    <CardDescription className="flex items-center gap-4 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Phone className="h-3 w-3" />
                         {request.requesterPhone}
@@ -119,6 +154,13 @@ export function RequestsManager() {
                         <MapPin className="h-3 w-3" />
                         {request.address}
                       </span>
+                      {request.station && (
+                        <span className="flex items-center gap-1 text-blue-600">
+                          <Badge variant="outline" className="text-xs">
+                            📍 {request.station.name}
+                          </Badge>
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -148,7 +190,11 @@ export function RequestsManager() {
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <span className="text-sm font-medium">
-                          Assigné à {request.mechanic.user.name}
+                          Assigné à {
+                            request.mechanic.user?.name || 
+                            `${request.mechanic.firstName || ''} ${request.mechanic.lastName || ''}`.trim() || 
+                            'Mécanicien'
+                          }
                         </span>
                       </div>
                     </div>
@@ -170,7 +216,19 @@ export function RequestsManager() {
                           ) : (
                             availableMechanics.map((mechanic) => (
                               <SelectItem key={mechanic.id} value={mechanic.id}>
-                                {mechanic.user.name} - {mechanic.specialties.join(', ')}
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {
+                                      mechanic.user?.name || 
+                                      `${mechanic.firstName || ''} ${mechanic.lastName || ''}`.trim() || 
+                                      'Mécanicien'
+                                    }
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {mechanic.specialties?.length > 0 ? mechanic.specialties.join(', ') : 'Généraliste'}
+                                    {mechanic.station?.name && ` • ${mechanic.station.name}`}
+                                  </span>
+                                </div>
                               </SelectItem>
                             ))
                           )}

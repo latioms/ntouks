@@ -56,7 +56,10 @@ export default function Home() {
 
             <div className="flex gap-4 items-center justify-center flex-col sm:flex-row">
               <Button size="lg" asChild>
-                <Link href="/register">Commencer gratuitement</Link>
+                <Link href="/assist">Demander de l'aide</Link>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/track">Suivre ma demande</Link>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <Link href="/login">Se connecter</Link>

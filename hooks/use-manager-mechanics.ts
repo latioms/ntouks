@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 
 interface Mechanic {
   id: string;
+  firstName?: string;
+  lastName?: string;
   specialties: string[];
   isAvailable: boolean;
   createdAt: string;
-  user: {
+  user?: {
     name: string;
     email: string;
     phone?: string;

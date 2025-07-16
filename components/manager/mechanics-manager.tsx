@@ -149,15 +149,15 @@ export function MechanicsManager() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      {mechanic.user.name}
+                      {mechanic.firstName}
                       {getStatusBadge(mechanic.isAvailable)}
                     </CardTitle>
                     <CardDescription className="flex items-center gap-4">
                       <span className="flex items-center gap-1">
                         <Mail className="h-3 w-3" />
-                        {mechanic.user.email}
+                        {mechanic.user?.email}
                       </span>
-                      {mechanic.user.phone && (
+                      {mechanic.user?.phone && (
                         <span className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
                           {mechanic.user.phone}

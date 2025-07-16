@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -16,15 +15,14 @@ import {
   Phone, 
   Mail, 
   Car, 
-  AlertTriangle, 
-  CheckCircle,
-  Loader2,
-  Navigation,
+  Wrench, 
+  AlertTriangle,
   Clock,
-  User,
-  Wrench
+  Navigation,
+  Loader2
 } from "lucide-react";
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { useRouter } from "next/navigation";
 
 interface Station {
   id: string;
@@ -39,11 +37,40 @@ interface Station {
   distance?: number;
 }
 
-interface LocationData {
+interface RequestFormData {
+  requesterName: string;
+  requesterPhone: string;
+  requesterEmail: string;
+  breakdownType: string;
+  description: string;
+  urgency: number;
+  address: string;
   latitude: number;
   longitude: number;
-  address?: string;
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: number;
+  licensePlate: string;
+  stationId: string;
 }
+
+const breakdownTypes = [
+  { value: "MECHANICAL", label: "Mécanique" },
+  { value: "ELECTRICAL", label: "Électrique" },
+  { value: "TIRE", label: "Pneu" },
+  { value: "BATTERY", label: "Batterie" },
+  { value: "ENGINE", label: "Moteur" },
+  { value: "TRANSMISSION", label: "Transmission" },
+  { value: "BRAKES", label: "Freins" },
+  { value: "OTHER", label: "Autre" }
+];
+
+const urgencyLevels = [
+  { value: 1, label: "Faible", color: "bg-green-100 text-green-800" },
+  { value: 2, label: "Moyenne", color: "bg-yellow-100 text-yellow-800" },
+  { value: 3, label: "Élevée", color: "bg-orange-100 text-orange-800" },
+  { value: 4, label: "Critique", color: "bg-red-100 text-red-800" }
+];
 
 const mapContainerStyle = {
   width: '100%',
@@ -52,54 +79,33 @@ const mapContainerStyle = {
 };
 
 const defaultCenter = {
-  lat: 3.8480, // Cameroun - Yaoundé coordinates
-  lng: 11.5021
+  lat: 14.6928, // Dakar coordinates
+  lng: -17.4467
 };
 
-export default function AssistPage() {
+export default function RequestPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
-  const [requestCreated, setRequestCreated] = useState(false);
-  const [requestId, setRequestId] = useState<string | null>(null);
-
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RequestFormData>({
     requesterName: "",
     requesterPhone: "",
     requesterEmail: "",
     breakdownType: "",
     description: "",
-    urgency: "2",
+    urgency: 2,
     address: "",
     latitude: 0,
     longitude: 0,
     vehicleBrand: "",
     vehicleModel: "",
-    vehicleYear: "",
+    vehicleYear: new Date().getFullYear(),
     licensePlate: "",
     stationId: ""
   });
-
-  const breakdownTypes = [
-    { value: "MECHANICAL", label: "Mécanique" },
-    { value: "ELECTRICAL", label: "Électrique" },
-    { value: "TIRE", label: "Pneu" },
-    { value: "BATTERY", label: "Batterie" },
-    { value: "ENGINE", label: "Moteur" },
-    { value: "TRANSMISSION", label: "Transmission" },
-    { value: "BRAKES", label: "Freins" },
-    { value: "OTHER", label: "Autre" }
-  ];
-
-  const urgencyLevels = [
-    { value: "1", label: "Faible", color: "bg-green-100 text-green-800" },
-    { value: "2", label: "Moyenne", color: "bg-yellow-100 text-yellow-800" },
-    { value: "3", label: "Élevée", color: "bg-orange-100 text-orange-800" },
-    { value: "4", label: "Critique", color: "bg-red-100 text-red-800" }
-  ];
 
   // Charger les stations
   useEffect(() => {
@@ -150,7 +156,7 @@ export default function AssistPage() {
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.GMAP_API_KEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
       );
       const data = await response.json();
       
@@ -192,202 +198,61 @@ export default function AssistPage() {
     }));
   };
 
-  const getCurrentLocation = async () => {
-    try {
-      if (!navigator.geolocation) {
-        throw new Error("Géolocalisation non supportée");
-      }
-
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000
-        });
-      });
-
-      const { latitude, longitude } = position.coords;
-      
-      const location = { lat: latitude, lng: longitude };
-      setUserLocation(location);
-      setMapCenter(location);
-      setFormData(prev => ({
-        ...prev,
-        latitude,
-        longitude
-      }));
-      
-      reverseGeocode(latitude, longitude);
-      toast.success("Position GPS obtenue !");
-    } catch (error) {
-      console.error("Erreur géolocalisation:", error);
-      toast.error("Impossible d'obtenir votre position. Veuillez saisir votre adresse manuellement.");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.stationId) {
-      toast.error('Veuillez remonter et sélectionner une station sur la carte');
-      // Faire défiler vers la section station
-      document.getElementById('station-selection')?.scrollIntoView({ 
-        behavior: 'smooth' 
-      });
-      return;
-    }
-    
-    if (!userLocation && !formData.address) {
-      toast.error("Veuillez obtenir votre position GPS ou saisir votre adresse");
+      toast.error('Veuillez sélectionner une station');
       return;
     }
 
     setLoading(true);
-    try {
-      const requestData = {
-        ...formData,
-        latitude: formData.latitude || userLocation?.lat || 0,
-        longitude: formData.longitude || userLocation?.lng || 0,
-        urgency: parseInt(formData.urgency)
-      };
 
+    try {
       const response = await fetch('/api/request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de la création de la demande');
+      if (response.ok) {
+        const result = await response.json();
+        toast.success('Demande créée avec succès!');
+        router.push(`/track?id=${result.id}`);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Erreur lors de la création de la demande');
       }
-
-      setRequestId(data.id || data.request?.id);
-      setRequestCreated(true);
-      toast.success("Demande d'assistance envoyée avec succès !");
-
     } catch (error) {
-      console.error("Erreur:", error);
-      toast.error(error instanceof Error ? error.message : "Erreur inconnue");
+      console.error('Erreur:', error);
+      toast.error('Erreur lors de la création de la demande');
     } finally {
       setLoading(false);
     }
   };
 
-  if (requestCreated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <CardTitle className="text-green-600">Demande envoyée !</CardTitle>
-            <CardDescription>
-              Votre demande d'assistance a été transmise à la station sélectionnée
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <Clock className="h-4 w-4" />
-              <AlertDescription>
-                <strong>ID de suivi:</strong> {requestId}<br/>
-                Vous recevrez un appel sous peu pour confirmer l'intervention.
-              </AlertDescription>
-            </Alert>
-            <div className="space-y-2">
-              <Button 
-                onClick={() => router.push(`/track?id=${requestId}`)}
-                className="w-full"
-              >
-                Suivre ma demande
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setRequestCreated(false);
-                  setRequestId(null);
-                  setSelectedStation(null);
-                  setFormData({
-                    requesterName: "",
-                    requesterPhone: "",
-                    requesterEmail: "",
-                    breakdownType: "",
-                    description: "",
-                    urgency: "2",
-                    address: "",
-                    latitude: 0,
-                    longitude: 0,
-                    vehicleBrand: "",
-                    vehicleModel: "",
-                    vehicleYear: "",
-                    licensePlate: "",
-                    stationId: ""
-                  });
-                }}
-                className="w-full"
-              >
-                Nouvelle demande
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Demande d'assistance routière</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Nouvelle demande d'assistance</h1>
           <p className="text-gray-600 mt-2">
             Sélectionnez une station et décrivez votre problème pour recevoir de l'aide
           </p>
-          
-          {/* Indicateur de progrès */}
-          <div className="mt-6 flex items-center space-x-4">
-            <div className={`flex items-center space-x-2 ${selectedStation ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedStation ? 'bg-green-100' : 'bg-gray-100'}`}>
-                {selectedStation ? <CheckCircle className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
-              </div>
-              <span className="font-medium">Station sélectionnée</span>
-            </div>
-            
-            <div className={`w-8 h-1 ${selectedStation ? 'bg-green-200' : 'bg-gray-200'}`}></div>
-            
-            <div className={`flex items-center space-x-2 ${selectedStation ? 'text-blue-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedStation ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                <Wrench className="h-5 w-5" />
-              </div>
-              <span className="font-medium">Formulaire</span>
-            </div>
-          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Sélection de station avec carte */}
-          <Card id="station-selection">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Sélectionner une station *
+                Sélectionner une station
               </CardTitle>
               <CardDescription>
                 Choisissez la station la plus proche de votre localisation
-                {!selectedStation && (
-                  <span className="text-red-600 font-medium block mt-1">
-                    ⚠️ Vous devez sélectionner une station avant de continuer
-                  </span>
-                )}
-                {selectedStation && (
-                  <span className="text-green-600 font-medium block mt-1">
-                    ✅ Station sélectionnée : {selectedStation.name}
-                  </span>
-                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -403,11 +268,12 @@ export default function AssistPage() {
                       position={userLocation}
                       icon={{
                         url: 'data:image/svg+xml;base64,' + btoa(`
-                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="12" cy="12" r="8" fill="#3B82F6"/>
                             <circle cx="12" cy="12" r="3" fill="white"/>
                           </svg>
-                        `)
+                        `),
+                        scaledSize: new google.maps.Size(24, 24)
                       }}
                       title="Votre position"
                     />
@@ -422,19 +288,20 @@ export default function AssistPage() {
                       icon={{
                         url: selectedStation?.id === station.id
                           ? 'data:image/svg+xml;base64,' + btoa(`
-                              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#EF4444"/>
                                 <path d="M2 17L12 22L22 17" stroke="#EF4444" stroke-width="2"/>
                                 <path d="M2 12L12 17L22 12" stroke="#EF4444" stroke-width="2"/>
                               </svg>
                             `)
                           : 'data:image/svg+xml;base64,' + btoa(`
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#10B981"/>
                                 <path d="M2 17L12 22L22 17" stroke="#10B981" stroke-width="2"/>
                                 <path d="M2 12L12 17L22 12" stroke="#10B981" stroke-width="2"/>
                               </svg>
-                            `)
+                            `),
+                        scaledSize: new google.maps.Size(selectedStation?.id === station.id ? 32 : 24, selectedStation?.id === station.id ? 32 : 24)
                       }}
                     />
                   ))}
@@ -479,11 +346,9 @@ export default function AssistPage() {
                         <p className="text-sm text-gray-600">{station.phone}</p>
                       </div>
                       <div className="text-right">
-                        {userLocation && (
-                          <Badge variant="outline">
-                            {station.distance?.toFixed(1)} km
-                          </Badge>
-                        )}
+                        <Badge variant="outline">
+                          {station.distance?.toFixed(1)} km
+                        </Badge>
                         {station.isActive ? (
                           <Badge className="ml-2 bg-green-100 text-green-800">
                             Ouvert
@@ -512,95 +377,114 @@ export default function AssistPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Nom complet *</Label>
+                  <Label htmlFor="requesterName">Nom complet *</Label>
                   <Input
-                    id="name"
+                    id="requesterName"
+                    required
                     value={formData.requesterName}
                     onChange={(e) => setFormData(prev => ({ ...prev, requesterName: e.target.value }))}
-                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="phone">Téléphone *</Label>
+                  <Label htmlFor="requesterPhone">Téléphone *</Label>
                   <Input
-                    id="phone"
+                    id="requesterPhone"
                     type="tel"
+                    required
                     value={formData.requesterPhone}
                     onChange={(e) => setFormData(prev => ({ ...prev, requesterPhone: e.target.value }))}
-                    required
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="email">Email (optionnel)</Label>
+                <Label htmlFor="requesterEmail">Email (optionnel)</Label>
                 <Input
-                  id="email"
+                  id="requesterEmail"
                   type="email"
                   value={formData.requesterEmail}
                   onChange={(e) => setFormData(prev => ({ ...prev, requesterEmail: e.target.value }))}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Localisation */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Navigation className="h-5 w-5" />
-                Votre position
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Button
-                  type="button"
-                  onClick={getCurrentLocation}
-                  variant={userLocation ? "outline" : "default"}
-                  className="flex items-center gap-2"
-                >
-                  <Navigation className="h-4 w-4" />
-                  {userLocation ? "Position obtenue" : "Obtenir ma position GPS"}
-                </Button>
-                {userLocation && (
-                  <Badge variant="outline" className="text-green-600">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    GPS activé
-                  </Badge>
-                )}
-              </div>
               <div>
-                <Label htmlFor="address">Adresse complète *</Label>
+                <Label htmlFor="address">Adresse *</Label>
                 <Input
                   id="address"
+                  required
                   value={formData.address}
                   onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Rue, ville, code postal..."
-                  required
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Informations sur la panne */}
+          {/* Informations du véhicule */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Car className="h-5 w-5" />
+                Informations du véhicule
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="vehicleBrand">Marque</Label>
+                  <Input
+                    id="vehicleBrand"
+                    value={formData.vehicleBrand}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleBrand: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="vehicleModel">Modèle</Label>
+                  <Input
+                    id="vehicleModel"
+                    value={formData.vehicleModel}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="vehicleYear">Année</Label>
+                  <Input
+                    id="vehicleYear"
+                    type="number"
+                    min="1990"
+                    max={new Date().getFullYear()}
+                    value={formData.vehicleYear}
+                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleYear: parseInt(e.target.value) }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="licensePlate">Plaque d'immatriculation</Label>
+                <Input
+                  id="licensePlate"
+                  value={formData.licensePlate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, licensePlate: e.target.value }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Détails du problème */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
-                Description de la panne
+                Détails du problème
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="breakdown">Type de panne *</Label>
+                  <Label htmlFor="breakdownType">Type de panne *</Label>
                   <Select 
+                    required
                     value={formData.breakdownType} 
                     onValueChange={(value) => setFormData(prev => ({ ...prev, breakdownType: value }))}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionnez le type" />
+                      <SelectValue placeholder="Sélectionnez le type de panne" />
                     </SelectTrigger>
                     <SelectContent>
                       {breakdownTypes.map((type) => (
@@ -614,15 +498,16 @@ export default function AssistPage() {
                 <div>
                   <Label htmlFor="urgency">Niveau d'urgence *</Label>
                   <Select 
-                    value={formData.urgency} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, urgency: value }))}
+                    required
+                    value={formData.urgency.toString()} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, urgency: parseInt(value) }))}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Sélectionnez l'urgence" />
                     </SelectTrigger>
                     <SelectContent>
                       {urgencyLevels.map((level) => (
-                        <SelectItem key={level.value} value={level.value}>
+                        <SelectItem key={level.value} value={level.value.toString()}>
                           <Badge className={level.color}>
                             {level.label}
                           </Badge>
@@ -636,87 +521,37 @@ export default function AssistPage() {
                 <Label htmlFor="description">Description détaillée *</Label>
                 <Textarea
                   id="description"
+                  required
+                  rows={4}
+                  placeholder="Décrivez le problème en détail..."
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Décrivez le problème en détail..."
-                  rows={4}
-                  required
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Informations véhicule */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5" />
-                Informations véhicule (optionnel)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="brand">Marque</Label>
-                  <Input
-                    id="brand"
-                    value={formData.vehicleBrand}
-                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleBrand: e.target.value }))}
-                    placeholder="Ex: Toyota"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="model">Modèle</Label>
-                  <Input
-                    id="model"
-                    value={formData.vehicleModel}
-                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
-                    placeholder="Ex: Camry"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="year">Année</Label>
-                  <Input
-                    id="year"
-                    type="number"
-                    value={formData.vehicleYear}
-                    onChange={(e) => setFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
-                    placeholder="Ex: 2020"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="plate">Plaque d'immatriculation</Label>
-                <Input
-                  id="plate"
-                  value={formData.licensePlate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, licensePlate: e.target.value }))}
-                  placeholder="Ex: CM-123-YDE"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            {!formData.stationId && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Veuillez remonter et sélectionner une station sur la carte pour continuer
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <Button type="submit" disabled={loading || !formData.stationId} className="w-full">
+          {/* Boutons d'action */}
+          <div className="flex gap-4 justify-end">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => router.back()}
+            >
+              Annuler
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={loading || !formData.stationId}
+              className="min-w-32"
+            >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Envoi en cours...
+                  Création...
                 </>
-              ) : !formData.stationId ? (
-                "Sélectionnez d'abord une station"
               ) : (
-                "Envoyer la demande d'assistance"
+                'Créer la demande'
               )}
             </Button>
           </div>

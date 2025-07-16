@@ -19,8 +19,12 @@ import {
   AlertTriangle,
   Car,
   Wrench,
-  Loader2
+  Loader2,
+  Navigation,
+  MessageCircle
 } from "lucide-react";
+import { GoogleMap, LoadScript, Marker, InfoWindow, DirectionsRenderer } from '@react-google-maps/api';
+import { subscribeToRequestUpdates, subscribeMechanicLocation } from "@/lib/supabase";
 
 interface Request {
   id: string;
@@ -31,6 +35,8 @@ interface Request {
   description: string;
   urgency: number;
   address: string;
+  latitude: number;
+  longitude: number;
   status: string;
   priority: number;
   createdAt: string;
@@ -39,7 +45,12 @@ interface Request {
   completedAt?: string;
   mechanic?: {
     id: string;
-    user: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    latitude?: number;
+    longitude?: number;
+    user?: {
       name: string;
       phone?: string;
     };
@@ -48,17 +59,144 @@ interface Request {
     name: string;
     address: string;
     phone: string;
+    latitude: number;
+    longitude: number;
   };
+  interventions?: any[];
+  invoice?: any;
 }
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '400px',
+  borderRadius: '12px'
+};
+
+const defaultCenter = {
+  lat: 3.8480, // Cameroun - Yaoundé coordinates  
+  lng: 11.5021
+};
 
 export default function TrackPage() {
   const searchParams = useSearchParams();
   const phoneParam = searchParams.get('phone');
+  const idParam = searchParams.get('id');
   
   const [phone, setPhone] = useState(phoneParam || "");
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+  const [mechanicLocation, setMechanicLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [directionsResult, setDirectionsResult] = useState<google.maps.DirectionsResult | null>(null);
+  const [trackingActive, setTrackingActive] = useState(false);
+
+  // Rechercher par ID si fourni en paramètre
+  useEffect(() => {
+    if (idParam && !searched) {
+      searchRequestById(idParam);
+    } else if (phoneParam && !searched) {
+      searchRequests();
+    }
+  }, [idParam, phoneParam]);
+
+  // S'abonner aux mises à jour temps réel quand une demande est sélectionnée
+  useEffect(() => {
+    if (!selectedRequest) return;
+
+    const subscription = subscribeToRequestUpdates(
+      selectedRequest.id,
+      (payload) => {
+        console.log('Mise à jour de la demande:', payload);
+        // Recharger les données de la demande
+        searchRequestById(selectedRequest.id);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [selectedRequest?.id]);
+
+  // S'abonner à la localisation du mécanicien
+  useEffect(() => {
+    if (!selectedRequest?.mechanic?.id || selectedRequest.status !== 'IN_PROGRESS') return;
+
+    const subscription = subscribeMechanicLocation(
+      selectedRequest.mechanic.id,
+      (payload) => {
+        console.log('Mise à jour localisation mécanicien:', payload);
+        setMechanicLocation({
+          lat: payload.latitude,
+          lng: payload.longitude
+        });
+        
+        // Mettre à jour les directions si on a la localisation client
+        if (selectedRequest.latitude && selectedRequest.longitude) {
+          calculateRoute(
+            { lat: payload.latitude, lng: payload.longitude },
+            { lat: selectedRequest.latitude, lng: selectedRequest.longitude }
+          );
+        }
+      }
+    );
+
+    setTrackingActive(true);
+
+    return () => {
+      subscription.unsubscribe();
+      setTrackingActive(false);
+    };
+  }, [selectedRequest?.mechanic?.id, selectedRequest?.status]);
+
+  const calculateRoute = async (
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number }
+  ) => {
+    if (!window.google) return;
+
+    const directionsService = new google.maps.DirectionsService();
+    
+    try {
+      const result = await directionsService.route({
+        origin: origin,
+        destination: destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+      });
+      setDirectionsResult(result);
+    } catch (error) {
+      console.error('Erreur lors du calcul de l\'itinéraire:', error);
+    }
+  };
+
+  const searchRequestById = async (requestId: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/request/${requestId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la recherche');
+      }
+
+      setSelectedRequest(data.request);
+      setRequests([data.request]);
+      setSearched(true);
+
+      if (data.request.mechanic?.latitude && data.request.mechanic?.longitude) {
+        setMechanicLocation({
+          lat: data.request.mechanic.latitude,
+          lng: data.request.mechanic.longitude
+        });
+      }
+
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error(error instanceof Error ? error.message : "Erreur de recherche");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -281,11 +419,11 @@ export default function TrackPage() {
                         <Alert>
                           <User className="h-4 w-4" />
                           <AlertDescription>
-                            <strong>Mécanicien assigné:</strong> {request.mechanic.user.name}
-                            {request.mechanic.user.phone && (
+                            <strong>Mécanicien assigné:</strong> {request.mechanic.user?.name || `${request.mechanic.firstName} ${request.mechanic.lastName}`}
+                            {(request.mechanic.user?.phone || request.mechanic.phone) && (
                               <>
                                 <br />
-                                <strong>Contact:</strong> {request.mechanic.user.phone}
+                                <strong>Contact:</strong> {request.mechanic.user?.phone || request.mechanic.phone}
                               </>
                             )}
                           </AlertDescription>
@@ -302,6 +440,125 @@ export default function TrackPage() {
                             <strong>Adresse:</strong> {request.station.address}
                             <br />
                             <strong>Téléphone:</strong> {request.station.phone}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {/* Carte de suivi en temps réel */}
+                      {request.status === 'IN_PROGRESS' && request.mechanic && (
+                        <div className="mt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                              <Navigation className="h-5 w-5" />
+                              Suivi en temps réel
+                            </h3>
+                            {trackingActive && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+                                  En direct
+                                </div>
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
+                            <GoogleMap
+                              mapContainerStyle={mapContainerStyle}
+                              center={mechanicLocation || { lat: request.latitude, lng: request.longitude }}
+                              zoom={14}
+                            >
+                              {/* Marqueur du client */}
+                              <Marker
+                                position={{ lat: request.latitude, lng: request.longitude }}
+                                icon={{
+                                  url: 'data:image/svg+xml;base64,' + btoa(`
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#EF4444"/>
+                                      <circle cx="12" cy="10" r="3" fill="white"/>
+                                    </svg>
+                                  `),
+                                  scaledSize: new google.maps.Size(32, 32)
+                                }}
+                                title="Votre position"
+                              />
+
+                              {/* Marqueur du mécanicien */}
+                              {mechanicLocation && (
+                                <Marker
+                                  position={mechanicLocation}
+                                  icon={{
+                                    url: 'data:image/svg+xml;base64,' + btoa(`
+                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" fill="#3B82F6"/>
+                                        <path d="M12 6v6l4 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                                      </svg>
+                                    `),
+                                    scaledSize: new google.maps.Size(32, 32)
+                                  }}
+                                  title={`Mécanicien: ${request.mechanic.user?.name || `${request.mechanic.firstName} ${request.mechanic.lastName}`}`}
+                                />
+                              )}
+
+                              {/* Itinéraire */}
+                              {directionsResult && (
+                                <DirectionsRenderer
+                                  directions={directionsResult}
+                                  options={{
+                                    suppressMarkers: true,
+                                    polylineOptions: {
+                                      strokeColor: '#3B82F6',
+                                      strokeWeight: 4,
+                                      strokeOpacity: 0.8
+                                    }
+                                  }}
+                                />
+                              )}
+                            </GoogleMap>
+                          </LoadScript>
+
+                          {/* Informations de trajet */}
+                          {directionsResult && (
+                            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <strong>Distance:</strong> {directionsResult.routes[0]?.legs[0]?.distance?.text}
+                                </div>
+                                <div>
+                                  <strong>Temps estimé:</strong> {directionsResult.routes[0]?.legs[0]?.duration?.text}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Affichage pour les autres statuts */}
+                      {(request.status === 'PENDING' || request.status === 'ASSIGNED') && (
+                        <Alert className="mt-6">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription>
+                            {request.status === 'PENDING' ? (
+                              <span>
+                                <strong>En attente de traitement</strong><br />
+                                Votre demande est en cours de traitement. Un mécanicien vous sera assigné sous peu.
+                              </span>
+                            ) : (
+                              <span>
+                                <strong>Mécanicien assigné</strong><br />
+                                Un mécanicien vous a été assigné et va bientôt vous contacter pour démarrer l'intervention.
+                              </span>
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {request.status === 'COMPLETED' && (
+                        <Alert className="mt-6">
+                          <CheckCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Intervention terminée</strong><br />
+                            L'intervention a été complétée avec succès. Merci d'avoir utilisé nos services.
                           </AlertDescription>
                         </Alert>
                       )}
