@@ -7,30 +7,23 @@ import { StatsCards } from "@/components/admin/stats-cards";
 import { OperationalMetrics } from "@/components/admin/operational-metrics";
 import { AdminActions } from "@/components/admin/admin-actions";
 import { InitializationView } from "@/components/admin/initialization-view";
-import { getPlatformStats } from "@/lib/admin-stats";
-
-interface AdminStats {
-  totalStations: number;
-  activeStations: number;
-  totalMechanics: number;
-  activeMechanics: number;
-  totalRequests: number;
-  pendingRequests: number;
-  totalRevenue: number;
-  platformUsers: number;
-}
+import type { AdminStats } from "@/types/admin";
 
 export function AdminDashboardClient() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Chargement des données réelles de la plateforme
+    // Chargement des données via l'API
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const platformStats = await getPlatformStats();
-        setStats(platformStats);
+        const response = await fetch('/api/admin/stats');
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des statistiques');
+        }
+        const data = await response.json();
+        setStats(data.stats);
       } catch (error) {
         console.error("Erreur lors du chargement:", error);
         setStats(null);

@@ -1,9 +1,8 @@
-"use client";
-
 import { useManagerPermissions } from "@/hooks/use-manager-permissions";
 import { StatsOverview } from "./stats-overview";
 import { RequestsManager } from "./requests-manager";
 import { MechanicsManager } from "./mechanics-manager";
+import { ReportsManager } from "./reports-manager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CompactRoleDisplay } from "@/components/ui/compact-role-display";
@@ -74,17 +73,7 @@ export function DynamicManagerDashboard() {
       case 'mechanics':
         return permissions.canManageMechanics ? <MechanicsManager /> : null;
       case 'reports':
-        return permissions.canViewReports ? (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">Rapports</h3>
-              <p className="text-muted-foreground">
-                Cette section sera bientôt disponible.
-              </p>
-            </CardContent>
-          </Card>
-        ) : null;
+        return permissions.canViewReports ? <ReportsManager /> : null;
       default:
         return null;
     }

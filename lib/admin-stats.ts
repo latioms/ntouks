@@ -7,8 +7,13 @@ export interface AdminStats {
   activeMechanics: number;
   totalRequests: number;
   pendingRequests: number;
+  completedRequests: number;
   totalRevenue: number;
   platformUsers: number;
+  recentRequests: number;
+  recentCompletions: number;
+  completionRate: number;
+  activeStationRate: number;
 }
 
 export async function getPlatformStats(): Promise<AdminStats> {
@@ -33,12 +38,24 @@ export async function getPlatformStats(): Promise<AdminStats> {
     const requests = await db.request.findMany({
       select: { 
         id: true, 
-        status: true
+        status: true,
+        createdAt: true,
+        completedAt: true
       }
     });
 
     const totalRequests = requests.length;
     const pendingRequests = requests.filter(req => req.status === "PENDING").length;
+    const completedRequests = requests.filter(req => req.status === "COMPLETED").length;
+
+    // Statistiques des 30 derniers jours
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentRequests = requests.filter(req => req.createdAt >= thirtyDaysAgo).length;
+    const recentCompletions = requests.filter(req => 
+      req.status === "COMPLETED" && req.completedAt && req.completedAt >= thirtyDaysAgo
+    ).length;
 
     // Calcul du chiffre d'affaires total à partir des factures
     const invoices = await db.invoice.findMany({
@@ -58,8 +75,13 @@ export async function getPlatformStats(): Promise<AdminStats> {
       activeMechanics,
       totalRequests,
       pendingRequests,
+      completedRequests,
       totalRevenue,
-      platformUsers
+      platformUsers,
+      recentRequests,
+      recentCompletions,
+      completionRate: totalRequests > 0 ? (completedRequests / totalRequests) * 100 : 0,
+      activeStationRate: totalStations > 0 ? (activeStations / totalStations) * 100 : 0
     };
   } catch (error) {
     console.error("Erreur lors de la récupération des statistiques:", error);

@@ -1,22 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { AdminStats } from "@/types/admin";
 import { 
   Users, 
   Building2, 
   Wrench, 
   TrendingUp
 } from "lucide-react";
-
-interface AdminStats {
-  totalStations: number;
-  activeStations: number;
-  totalMechanics: number;
-  activeMechanics: number;
-  totalRequests: number;
-  pendingRequests: number;
-  totalRevenue: number;
-  platformUsers: number;
-}
 
 interface StatsCardsProps {
   stats: AdminStats;

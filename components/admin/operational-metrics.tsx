@@ -1,15 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface AdminStats {
-  totalStations: number;
-  activeStations: number;
-  totalMechanics: number;
-  activeMechanics: number;
-  totalRequests: number;
-  pendingRequests: number;
-  totalRevenue: number;
-  platformUsers: number;
-}
+import type { AdminStats } from "@/types/admin";
 
 interface OperationalMetricsProps {
   stats: AdminStats;
