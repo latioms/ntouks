@@ -7,6 +7,7 @@ import {
   CreditCard,
   LogOut,
   Sparkles,
+  Shield,
 } from "lucide-react"
 
 import {
@@ -29,6 +30,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { UserRoleBadge } from "@/components/ui/user-role-badge"
+import { InlineRoleBadge } from "@/components/ui/inline-role-badge"
 
 export function NavUser({
   user,
@@ -56,7 +59,10 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  <InlineRoleBadge />
+                </div>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -75,7 +81,10 @@ export function NavUser({
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                    <InlineRoleBadge />
+                  </div>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -89,12 +98,12 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <BadgeCheck />
-                Account
+                <Shield />
+                Mon Rôle
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCard />
-                Billing
+                <BadgeCheck />
+                Compte
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Bell />

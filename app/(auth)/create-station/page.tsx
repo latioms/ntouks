@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, MapPin, Phone, Mail } from "lucide-react";
-import { createStation, createStationWithManager } from "@/app/actions/stations/manageStations";
+import { GeolocationHelper } from "@/components/ui/geolocation-helper";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
 
@@ -22,18 +22,32 @@ export default function CreateStationPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
   const router = useRouter();
   const { data: session } = useSession();
 
   // Vérifier les permissions au chargement
   useEffect(() => {
-    if (session === null) {
-      // Utilisateur non connecté
-      toast.error("Accès refusé", {
-        description: "Vous devez être connecté pour créer une station"
-      });
-      router.push("/login");
+    // Marquer le chargement de session comme terminé après un délai
+    const timer = setTimeout(() => {
+      setIsSessionLoading(false);
+      
+      // Si après le délai il n'y a toujours pas de session, rediriger
+      if (session === null || session === undefined) {
+        toast.error("Accès refusé", {
+          description: "Vous devez être connecté pour créer une station"
+        });
+        router.push("/login");
+      }
+    }, 1000);
+
+    // Si la session est déjà disponible, arrêter le chargement immédiatement
+    if (session?.user) {
+      setIsSessionLoading(false);
+      clearTimeout(timer);
     }
+
+    return () => clearTimeout(timer);
   }, [session, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +66,11 @@ export default function CreateStationPage() {
     try {
       // Vérifier que l'utilisateur est connecté
       if (!session?.user?.id) {
-        throw new Error("Vous devez être connecté pour créer une station");
+        toast.error("Session expirée", {
+          description: "Veuillez vous reconnecter pour continuer"
+        });
+        router.push("/login");
+        return;
       }
 
       // Validation des champs requis
@@ -81,10 +99,25 @@ export default function CreateStationPage() {
         email: formData.email || undefined
       };
 
-      // Créer la station et assigner l'utilisateur comme gestionnaire
-      const newStation = await createStationWithManager(stationData, session.user.id);
+      // Créer la station via l'API
+      console.log("Création de la station avec les données:", stationData);
+      console.log("ID utilisateur:", session.user.id);
       
-      console.log("Station créée:", newStation);
+      const response = await fetch('/api/stations/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(stationData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création de la station');
+      }
+
+      const result = await response.json();
+      console.log("Station créée avec succès:", result.station);
       
       // Notification de succès
       toast.success("Station créée avec succès !", {
@@ -96,11 +129,13 @@ export default function CreateStationPage() {
         router.push("/dashboard");
       }, 1500);
     } catch (err) {
+      console.error("Erreur détaillée lors de la création:", err);
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de la création de la station";
       setError(errorMessage);
       toast.error("Erreur", {
         description: errorMessage
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -114,13 +149,42 @@ export default function CreateStationPage() {
             latitude: position.coords.latitude.toString(),
             longitude: position.coords.longitude.toString()
           }));
+          toast.success("Position récupérée avec succès !");
         },
         (error) => {
           console.error("Erreur de géolocalisation:", error);
+          toast.error("Impossible de récupérer votre position");
         }
       );
+    } else {
+      toast.error("Géolocalisation non supportée par votre navigateur");
     }
   };
+
+  const handleLocationReceived = (location: { latitude: number; longitude: number }) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: location.latitude.toString(),
+      longitude: location.longitude.toString()
+    }));
+    toast.success("Position récupérée avec succès !");
+  };
+
+  // Afficher un écran de chargement si la session n'est pas encore chargée
+  if (isSessionLoading) {
+    return (
+      <div className="min-h-screen bg-muted flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <p className="text-sm text-muted-foreground">Vérification de votre session...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted flex items-center justify-center p-4">
@@ -207,15 +271,7 @@ export default function CreateStationPage() {
                 </div>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGetLocation}
-                className="w-full"
-              >
-                <MapPin className="mr-2 h-4 w-4" />
-                Utiliser ma position actuelle
-              </Button>
+              <GeolocationHelper onLocationReceived={handleLocationReceived} />
 
               <div>
                 <Label htmlFor="phone">Téléphone *</Label>

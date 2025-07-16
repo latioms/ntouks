@@ -11,6 +11,7 @@ import Image from "next/image"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { SidebarRoleIndicator } from "@/components/ui/sidebar-role-indicator"
 import {
   Sidebar,
   SidebarContent,
@@ -72,6 +73,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             Ntouks
           </span>
         </div>
+        <SidebarRoleIndicator />
       </SidebarHeader>
       
       <SidebarContent>

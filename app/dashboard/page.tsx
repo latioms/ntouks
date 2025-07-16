@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DynamicManagerDashboard } from "@/components/manager/dynamic-manager-dashboard";
 import { 
   Building2, 
   Users, 
@@ -112,129 +113,11 @@ export default function DashboardPage() {
     return null; // Redirection en cours
   }
 
-  // Dashboard pour STATION_MANAGER
-  if (user.role?.name === 'STATION_MANAGER') {
-    // Si aucune station n'est configurée
-    if (!stationInfo) {
-      return (
-        <div className="min-h-screen bg-muted flex items-center justify-center">
-          <div className="text-center space-y-6 max-w-md">
-            <Building2 className="h-16 w-16 mx-auto text-muted-foreground" />
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold">Aucune station configurée</h1>
-              <p className="text-muted-foreground">
-                Vous devez d'abord créer ou configurer votre station pour accéder au tableau de bord.
-              </p>
-            </div>
-            <Button onClick={() => router.push('/create-station')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Créer une station
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
+  // Dashboard pour STATION_MANAGER et ADMIN
+  if (user.role?.name === 'STATION_MANAGER' || user.role?.name === 'ADMIN') {
     return (
-      <div className="min-h-screen bg-muted p-4 space-y-6">
-        {/* En-tête Station Manager */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Tableau de Bord - Gestionnaire</h1>
-            <p className="text-muted-foreground">
-              Gérez votre station et supervisez vos mécaniciens
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Settings className="mr-2 h-4 w-4" />
-              Paramètres
-            </Button>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Ajouter un mécanicien
-            </Button>
-          </div>
-        </div>
-
-        {/* Informations de la station */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              {stationInfo.name}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span>{stationInfo.address}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{stationInfo.phone}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Statistiques Station */}
-        {stationStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Mécaniciens</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stationStats.totalMechanics}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stationStats.activeMechanics} actuellement actifs
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Demandes en attente</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stationStats.pendingRequests}</div>
-                <p className="text-xs text-muted-foreground">
-                  Temps moyen: {stationStats.averageResponseTime}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Interventions aujourd'hui</CardTitle>
-                <Wrench className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stationStats.completedToday}</div>
-                <p className="text-xs text-muted-foreground">
-                  +15% par rapport à hier
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Chiffre d'affaires</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stationStats.revenue.toLocaleString()} FCFA</div>
-                <p className="text-xs text-muted-foreground">
-                  Ce mois-ci
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+      <div className="min-h-screen bg-background p-4">
+        <DynamicManagerDashboard />
       </div>
     );
   }
