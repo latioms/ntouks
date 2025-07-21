@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useManagerRequests } from "@/hooks/use-manager-requests";
 import { useManagerMechanics } from "@/hooks/use-manager-mechanics";
+import { useMechanicAssignmentLimits } from "@/hooks/use-mechanic-assignment-limits";
 import { useState } from "react";
 import { toast } from "sonner";
 import { 
@@ -22,6 +23,12 @@ import {
 export function RequestsManager() {
   const { requests, loading, assignMechanic, fetchRequests } = useManagerRequests();
   const { mechanics, getAvailableMechanics } = useManagerMechanics();
+  const { 
+    limits, 
+    checkMechanicAvailability, 
+    getAvailableMechanics: getAvailableMechanicsForAssignment,
+    getMechanicTaskCount 
+  } = useMechanicAssignmentLimits();
   const [assigningRequest, setAssigningRequest] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
@@ -186,54 +193,122 @@ export function RequestsManager() {
                   </div>
 
                   {request.mechanic ? (
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium">
-                          Assigné à {
-                            request.mechanic.user?.name || 
-                            `${request.mechanic.firstName || ''} ${request.mechanic.lastName || ''}`.trim() || 
-                            'Mécanicien'
-                          }
-                        </span>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium">
+                            Assigné à {
+                              request.mechanic.user?.name || 
+                              `${request.mechanic.firstName || ''} ${request.mechanic.lastName || ''}`.trim() || 
+                              'Mécanicien'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                        {/* Possibilité de réassigner */}
+                      <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-md">
+                        <UserPlus className="h-4 w-4 text-blue-600" />
+                        <div className="flex-1">
+                          {getAvailableMechanicsForAssignment()
+                            .filter(mechanicLimit => mechanicLimit.mechanicId !== request.mechanic?.id)
+                            .length === 0 ? (
+                            <div className="text-sm text-muted-foreground">
+                              Aucun autre mécanicien disponible pour la réassignation
+                            </div>
+                          ) : (
+                            <Select 
+                              onValueChange={(mechanicId) => handleAssignMechanic(request.id, mechanicId)}
+                              disabled={assigningRequest === request.id}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Réassigner à un autre mécanicien" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getAvailableMechanicsForAssignment()
+                                  .filter(mechanicLimit => mechanicLimit.mechanicId !== request.mechanic?.id)
+                                  .map((mechanicLimit) => {
+                                    const mechanic = mechanics.find(m => m.id === mechanicLimit.mechanicId);
+                                    if (!mechanic) return null;
+                                    
+                                    return (
+                                      <SelectItem key={mechanic.id} value={mechanic.id}>
+                                        <div className="flex flex-col">
+                                          <div className="flex items-center justify-between">
+                                            <span className="font-medium">
+                                              {
+                                                mechanic.user?.name || 
+                                                `${mechanic.firstName || ''} ${mechanic.lastName || ''}`.trim() || 
+                                                'Mécanicien'
+                                              }
+                                            </span>
+                                            <span className="text-xs text-muted-foreground ml-2">
+                                              ({mechanicLimit.assignedRequestsCount}/{mechanicLimit.maxAllowed})
+                                            </span>
+                                          </div>
+                                          <span className="text-xs text-muted-foreground">
+                                            {mechanic.specialties?.length > 0 ? mechanic.specialties.join(', ') : 'Généraliste'}
+                                            {mechanic.station?.name && ` • ${mechanic.station.name}`}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                        {assigningRequest === request.id && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-md">
                       <UserPlus className="h-4 w-4 text-orange-600" />
-                      <Select 
-                        onValueChange={(mechanicId) => handleAssignMechanic(request.id, mechanicId)}
-                        disabled={assigningRequest === request.id}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Assigner un mécanicien" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableMechanics.length === 0 ? (
-                            <SelectItem value="" disabled>
-                              Aucun mécanicien disponible
-                            </SelectItem>
-                          ) : (
-                            availableMechanics.map((mechanic) => (
-                              <SelectItem key={mechanic.id} value={mechanic.id}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {
-                                      mechanic.user?.name || 
-                                      `${mechanic.firstName || ''} ${mechanic.lastName || ''}`.trim() || 
-                                      'Mécanicien'
-                                    }
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {mechanic.specialties?.length > 0 ? mechanic.specialties.join(', ') : 'Généraliste'}
-                                    {mechanic.station?.name && ` • ${mechanic.station.name}`}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                      {getAvailableMechanicsForAssignment().length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          Aucun mécanicien disponible (tous ont 2+ tâches assignées)
+                        </div>
+                      ) : (
+                        <Select 
+                          onValueChange={(mechanicId) => handleAssignMechanic(request.id, mechanicId)}
+                          disabled={assigningRequest === request.id}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Assigner un mécanicien" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableMechanicsForAssignment().map((mechanicLimit) => {
+                              const mechanic = mechanics.find(m => m.id === mechanicLimit.mechanicId);
+                              if (!mechanic) return null;
+                              
+                              return (
+                                <SelectItem key={mechanic.id} value={mechanic.id}>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium">
+                                        {
+                                          mechanic.user?.name || 
+                                          `${mechanic.firstName || ''} ${mechanic.lastName || ''}`.trim() || 
+                                          'Mécanicien'
+                                        }
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-2">
+                                        ({mechanicLimit.assignedRequestsCount}/{mechanicLimit.maxAllowed})
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      {mechanic.specialties?.length > 0 ? mechanic.specialties.join(', ') : 'Généraliste'}
+                                      {mechanic.station?.name && ` • ${mechanic.station.name}`}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      )}
                       {assigningRequest === request.id && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}

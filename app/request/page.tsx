@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   Clock,
   Navigation,
-  Loader2
+  Loader2,
+  User
 } from "lucide-react";
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 import { useRouter } from "next/navigation";
@@ -201,6 +202,11 @@ export default function RequestPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!userLocation) {
+      toast.error('Veuillez définir votre localisation');
+      return;
+    }
+    
     if (!formData.stationId) {
       toast.error('Veuillez sélectionner une station');
       return;
@@ -244,26 +250,115 @@ export default function RequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Sélection de station avec carte */}
+          {/* Étape 1: Localisation */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Sélectionner une station
+                <Navigation className="h-5 w-5" />
+                Étape 1: Votre localisation
               </CardTitle>
               <CardDescription>
-                Choisissez la station la plus proche de votre localisation
+                Confirmez votre position actuelle ou ajustez-la sur la carte
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="address">Adresse de la panne *</Label>
+                <Input
+                  id="address"
+                  required
+                  value={formData.address}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Votre adresse actuelle..."
+                />
+              </div>
+              
               <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
                 <GoogleMap
                   mapContainerStyle={mapContainerStyle}
                   center={mapCenter}
-                  zoom={12}
+                  zoom={14}
+                  onClick={(e) => {
+                    if (e.latLng) {
+                      const lat = e.latLng.lat();
+                      const lng = e.latLng.lng();
+                      setUserLocation({ lat, lng });
+                      setFormData(prev => ({
+                        ...prev,
+                        latitude: lat,
+                        longitude: lng
+                      }));
+                      reverseGeocode(lat, lng);
+                    }
+                  }}
                 >
                   {/* Marqueur de l'utilisateur */}
                   {userLocation && (
+                    <Marker
+                      position={userLocation}
+                      draggable={true}
+                      onDragEnd={(e) => {
+                        if (e.latLng) {
+                          const lat = e.latLng.lat();
+                          const lng = e.latLng.lng();
+                          setUserLocation({ lat, lng });
+                          setFormData(prev => ({
+                            ...prev,
+                            latitude: lat,
+                            longitude: lng
+                          }));
+                          reverseGeocode(lat, lng);
+                        }
+                      }}
+                      icon={{
+                        url: 'data:image/svg+xml;base64,' + btoa(`
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="8" fill="#3B82F6"/>
+                            <circle cx="12" cy="12" r="3" fill="white"/>
+                          </svg>
+                        `),
+                        scaledSize: new google.maps.Size(32, 32)
+                      }}
+                      title="Votre position (glissez pour ajuster)"
+                    />
+                  )}
+                </GoogleMap>
+              </LoadScript>
+
+              {userLocation && (
+                <Alert>
+                  <MapPin className="h-4 w-4" />
+                  <AlertDescription>
+                    Position confirmée: {formData.address || `${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}`}
+                    <br />
+                    <small className="text-muted-foreground">Vous pouvez glisser le marqueur pour ajuster votre position</small>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Étape 2: Sélection de station (uniquement si localisation définie) */}
+          {userLocation && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Étape 2: Choisir une station d'assistance
+                </CardTitle>
+                <CardDescription>
+                  Stations triées par distance depuis votre position
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Carte avec stations et distances */}
+                <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
+                  <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={userLocation}
+                    zoom={12}
+                  >
+                    {/* Marqueur de l'utilisateur */}
                     <Marker
                       position={userLocation}
                       icon={{
@@ -277,101 +372,120 @@ export default function RequestPage() {
                       }}
                       title="Votre position"
                     />
-                  )}
 
-                  {/* Marqueurs des stations */}
-                  {stationsWithDistance.map((station) => (
-                    <Marker
-                      key={station.id}
-                      position={{ lat: station.latitude, lng: station.longitude }}
-                      onClick={() => handleStationSelect(station)}
-                      icon={{
-                        url: selectedStation?.id === station.id
-                          ? 'data:image/svg+xml;base64,' + btoa(`
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#EF4444"/>
-                                <path d="M2 17L12 22L22 17" stroke="#EF4444" stroke-width="2"/>
-                                <path d="M2 12L12 17L22 12" stroke="#EF4444" stroke-width="2"/>
-                              </svg>
-                            `)
-                          : 'data:image/svg+xml;base64,' + btoa(`
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#10B981"/>
-                                <path d="M2 17L12 22L22 17" stroke="#10B981" stroke-width="2"/>
-                                <path d="M2 12L12 17L22 12" stroke="#10B981" stroke-width="2"/>
-                              </svg>
-                            `),
-                        scaledSize: new google.maps.Size(selectedStation?.id === station.id ? 32 : 24, selectedStation?.id === station.id ? 32 : 24)
-                      }}
-                    />
-                  ))}
+                    {/* Marqueurs des stations */}
+                    {stationsWithDistance.map((station) => (
+                      <Marker
+                        key={station.id}
+                        position={{ lat: station.latitude, lng: station.longitude }}
+                        onClick={() => handleStationSelect(station)}
+                        icon={{
+                          url: selectedStation?.id === station.id
+                            ? 'data:image/svg+xml;base64,' + btoa(`
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#EF4444"/>
+                                  <path d="M2 17L12 22L22 17" stroke="#EF4444" stroke-width="2"/>
+                                  <path d="M2 12L12 17L22 12" stroke="#EF4444" stroke-width="2"/>
+                                </svg>
+                              `)
+                            : 'data:image/svg+xml;base64,' + btoa(`
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#10B981"/>
+                                  <path d="M2 17L12 22L22 17" stroke="#10B981" stroke-width="2"/>
+                                  <path d="M2 12L12 17L22 12" stroke="#10B981" stroke-width="2"/>
+                                </svg>
+                              `),
+                          scaledSize: new google.maps.Size(selectedStation?.id === station.id ? 32 : 24, selectedStation?.id === station.id ? 32 : 24)
+                        }}
+                      />
+                    ))}
 
-                  {/* InfoWindow pour la station sélectionnée */}
-                  {selectedStation && (
-                    <InfoWindow
-                      position={{ lat: selectedStation.latitude, lng: selectedStation.longitude }}
-                      onCloseClick={() => setSelectedStation(null)}
-                    >
-                      <div className="p-2">
-                        <h3 className="font-semibold">{selectedStation.name}</h3>
-                        <p className="text-sm text-gray-600">{selectedStation.address}</p>
-                        <p className="text-sm text-gray-600">{selectedStation.phone}</p>
-                        {selectedStation.distance && (
-                          <p className="text-sm text-blue-600">
-                            Distance: {selectedStation.distance.toFixed(1)} km
-                          </p>
+                    {/* InfoWindow pour la station sélectionnée */}
+                    {selectedStation && (
+                      <InfoWindow
+                        position={{ lat: selectedStation.latitude, lng: selectedStation.longitude }}
+                        onCloseClick={() => setSelectedStation(null)}
+                      >
+                        <div className="p-2">
+                          <h3 className="font-semibold">{selectedStation.name}</h3>
+                          <p className="text-sm text-gray-600">{selectedStation.address}</p>
+                          <p className="text-sm text-gray-600">{selectedStation.phone}</p>
+                          {selectedStation.distance && (
+                            <p className="text-sm text-blue-600 font-medium">
+                              Distance: {selectedStation.distance.toFixed(1)} km
+                            </p>
+                          )}
+                        </div>
+                      </InfoWindow>
+                    )}
+                  </GoogleMap>
+                </LoadScript>
+
+                {/* Liste des stations triées par distance */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-gray-700">
+                    Stations disponibles ({stationsWithDistance.length}) - Triées par distance
+                  </h4>
+                  <div className="grid gap-3 max-h-60 overflow-y-auto">
+                    {stationsWithDistance.map((station, index) => (
+                      <div
+                        key={station.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                          selectedStation?.id === station.id
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                        }`}
+                        onClick={() => handleStationSelect(station)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold">{station.name}</h3>
+                              {index === 0 && (
+                                <Badge className="bg-green-100 text-green-800 text-xs">
+                                  Plus proche
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">{station.address}</p>
+                            <p className="text-sm text-gray-600">{station.phone}</p>
+                          </div>
+                          <div className="text-right flex flex-col gap-2">
+                            <Badge variant="outline" className="text-blue-600 border-blue-200">
+                              {station.distance?.toFixed(1)} km
+                            </Badge>
+                            {station.isActive ? (
+                              <Badge className="bg-green-100 text-green-800">
+                                Ouvert
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive">
+                                Fermé
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {selectedStation?.id === station.id && (
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <p className="text-sm text-blue-700 font-medium">
+                              ✓ Station sélectionnée - Distance: {station.distance?.toFixed(1)} km
+                            </p>
+                          </div>
                         )}
                       </div>
-                    </InfoWindow>
-                  )}
-                </GoogleMap>
-              </LoadScript>
-
-              {/* Liste des stations */}
-              <div className="grid gap-3 max-h-60 overflow-y-auto">
-                {stationsWithDistance.map((station) => (
-                  <div
-                    key={station.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                      selectedStation?.id === station.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => handleStationSelect(station)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">{station.name}</h3>
-                        <p className="text-sm text-gray-600">{station.address}</p>
-                        <p className="text-sm text-gray-600">{station.phone}</p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="outline">
-                          {station.distance?.toFixed(1)} km
-                        </Badge>
-                        {station.isActive ? (
-                          <Badge className="ml-2 bg-green-100 text-green-800">
-                            Ouvert
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="ml-2">
-                            Fermé
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Informations personnelles */}
+          {/* Étape 3: Informations personnelles */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Vos informations
+                Étape 3: Vos informations
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -405,24 +519,15 @@ export default function RequestPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, requesterEmail: e.target.value }))}
                 />
               </div>
-              <div>
-                <Label htmlFor="address">Adresse *</Label>
-                <Input
-                  id="address"
-                  required
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                />
-              </div>
             </CardContent>
           </Card>
 
-          {/* Informations du véhicule */}
+          {/* Étape 4: Informations du véhicule */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Car className="h-5 w-5" />
-                Informations du véhicule
+                Étape 4: Informations du véhicule
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -466,12 +571,12 @@ export default function RequestPage() {
             </CardContent>
           </Card>
 
-          {/* Détails du problème */}
+          {/* Étape 5: Détails du problème */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
-                Détails du problème
+                Étape 5: Détails du problème
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -542,7 +647,7 @@ export default function RequestPage() {
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.stationId}
+              disabled={loading || !userLocation || !formData.stationId}
               className="min-w-32"
             >
               {loading ? (

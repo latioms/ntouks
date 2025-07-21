@@ -3,6 +3,7 @@ import { StatsOverview } from "./stats-overview";
 import { RequestsManager } from "./requests-manager";
 import { MechanicsManager } from "./mechanics-manager";
 import { ReportsManager } from "./reports-manager";
+import { MechanicAssignmentLimitsView } from "./mechanic-assignment-limits";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CompactRoleDisplay } from "@/components/ui/compact-role-display";
@@ -12,11 +13,12 @@ import {
   Users, 
   FileText,
   Shield,
-  Loader2
+  Loader2,
+  ListChecks
 } from "lucide-react";
 import { useState } from "react";
 
-type DashboardSection = 'stats' | 'requests' | 'mechanics' | 'reports';
+type DashboardSection = 'stats' | 'requests' | 'mechanics' | 'reports' | 'assignment-limits';
 
 export function DynamicManagerDashboard() {
   const { permissions, role, loading, getDashboardSections, isAdmin, isManager } = useManagerPermissions();
@@ -59,6 +61,8 @@ export function DynamicManagerDashboard() {
         return <Users className="h-4 w-4" />;
       case 'reports':
         return <FileText className="h-4 w-4" />;
+      case 'assignment-limits':
+        return <ListChecks className="h-4 w-4" />;
       default:
         return null;
     }
@@ -74,6 +78,8 @@ export function DynamicManagerDashboard() {
         return permissions.canManageMechanics ? <MechanicsManager /> : null;
       case 'reports':
         return permissions.canViewReports ? <ReportsManager /> : null;
+      case 'assignment-limits':
+        return permissions.canViewAssignmentLimits ? <MechanicAssignmentLimitsView /> : null;
       default:
         return null;
     }

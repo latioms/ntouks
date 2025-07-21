@@ -11,6 +11,7 @@ interface DashboardPermissions {
   canManageStations: boolean;
   canViewReports: boolean;
   canManageSettings: boolean;
+  canViewAssignmentLimits: boolean;
 }
 
 export function useManagerPermissions() {
@@ -26,7 +27,8 @@ export function useManagerPermissions() {
         canManageUsers: false,
         canManageStations: false,
         canViewReports: false,
-        canManageSettings: false
+        canManageSettings: false,
+        canViewAssignmentLimits: false
       };
     }
 
@@ -40,7 +42,8 @@ export function useManagerPermissions() {
           canManageUsers: true,
           canManageStations: true,
           canViewReports: true,
-          canManageSettings: true
+          canManageSettings: true,
+          canViewAssignmentLimits: true
         };
 
       case 'station-manager':
@@ -52,7 +55,8 @@ export function useManagerPermissions() {
           canManageUsers: false,
           canManageStations: false,
           canViewReports: true,
-          canManageSettings: false
+          canManageSettings: false,
+          canViewAssignmentLimits: true
         };
 
       case 'mechanic':
@@ -64,7 +68,8 @@ export function useManagerPermissions() {
           canManageUsers: false,
           canManageStations: false,
           canViewReports: false,
-          canManageSettings: false
+          canManageSettings: false,
+          canViewAssignmentLimits: false
         };
 
       default:
@@ -76,7 +81,8 @@ export function useManagerPermissions() {
           canManageUsers: false,
           canManageStations: false,
           canViewReports: false,
-          canManageSettings: false
+          canManageSettings: false,
+          canViewAssignmentLimits: false
         };
     }
   };
@@ -110,6 +116,15 @@ export function useManagerPermissions() {
         title: 'Mécaniciens',
         description: 'Gérer l\'équipe technique',
         icon: 'Users'
+      });
+    }
+
+    if (permissions.canViewAssignmentLimits) {
+      sections.push({
+        id: 'assignment-limits',
+        title: 'Limites d\'assignation',
+        description: 'Gérer les tâches assignées',
+        icon: 'ListChecks'
       });
     }
 

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useMechanicStats } from "@/hooks/use-mechanic-stats";
 import { useMechanicRequests } from "@/hooks/use-mechanic-requests";
+import { MechanicTaskAcceptance } from "@/components/mechanic/task-acceptance";
 
 const statusOptions = [
   { value: 'PENDING', label: 'En attente' },
@@ -339,6 +340,18 @@ export function MechanicDashboard() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+export default function MechanicDashboardPage() {
+  return (
+    <div className="space-y-8">
+      {/* Section d'acceptation des tâches */}
+      <MechanicTaskAcceptance />
+      
+      {/* Dashboard principal */}
+      <MechanicDashboard />
     </div>
   );
 }
